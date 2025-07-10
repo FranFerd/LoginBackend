@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     class Config: # Tells pydantic where to look for env variables
-        env_file = '.env'
+        env_file = '.env' # No need for dotenv at all. Uninstal it
 
     @property # Turns a method into an attribute. Now settings.acceess_token_expire instead of settings.access_token_expire()
     def access_token_expire(self) -> timedelta:
