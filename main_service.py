@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from configs.cors_config import add_cors_middleware
-from database import create_table
+from configs.create_tables import create_tables
 
 class LoginMainService:
     def __init__(self):
@@ -21,7 +21,7 @@ class LoginMainService:
         @asynccontextmanager # FastAPI expects lifespan to be async context manager. A context manager is an object you can use with 'async with' or 'with' that automatically handles setup and cleanup around a block of code.
         async def lifespan(app: FastAPI): # Handles 
             print("App is running...")
-            await create_table()
+            await create_tables()
             yield
             print("App is shutting down...")
 

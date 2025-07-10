@@ -1,9 +1,9 @@
-from database import SessionLocal
+from database import async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import AsyncGenerator
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with SessionLocal() as session:
+    async with async_session() as session:
         yield session
 
 # @router.get("/users")
