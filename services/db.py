@@ -38,15 +38,33 @@ class DbService:
             await self.db.commit()
             await self.db.refresh(new_user)
             return new_user
-        except IntegrityError as e:
+        except IntegrityError:
             await self.db.rollback() # Always rollback on error
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, 
-                detail=f"Username or email already exist: {e}"
+                detail=f"Username or email already exist"
             )
-        except Exception as e:
+        except Exception:
             await self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Unexpected error while creating user: {e}"
+                detail=f"Unexpected error while creating user"
+            )
+        
+    async def verify_user(self, username: str, password: str)-> bool:
+        try:
+            result = await self.db.execute(
+                select(UserModel.password_hashed).where(UserModel.username == username)
+            )
+            hashed_password = result.scalar_one_or_none()
+            if hashed_password is None:
+                return False
+            
+            is_valid_password = Argon2Ph().verify_password(hashed_password, password)
+            return is_valid_password
+
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Unexpected error while creating user"
             )

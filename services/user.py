@@ -1,7 +1,15 @@
 from fastapi import HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+
+from datetime import timedelta
+
 from services.db import DbService
+from services.token import token_service
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from schemas.user import UserCredentialsEmail, UserSchema
+from schemas.token import TokenResponse
 
 class UserService:
     def __init__(self, db: AsyncSession):
@@ -34,5 +42,17 @@ class UserService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already in use"
             )
-            
-            
+        
+    async def token(self, user_credentials: OAuth2PasswordRequestForm):
+        is_valid_user = await self.db_service.verify_user(user_credentials.username, user_credentials.password)
+        if is_valid_user:
+            access_token = token_service.create_access_token(
+                username=user_credentials.username,
+                expires_delta=timedelta(minutes=15)
+            )
+            return TokenResponse(access_token=access_token, token_type='bearer')
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"
+        )           
