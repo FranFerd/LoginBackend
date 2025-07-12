@@ -4,6 +4,7 @@ from configs.cors_config import add_cors_middleware
 from configs.create_tables import create_tables
 
 from routers.auth import router as auth_router
+from routers.protected import router as protected_router
 
 class LoginMainService:
     def __init__(self):
@@ -18,6 +19,7 @@ class LoginMainService:
 
     def configure_routers(self):
         self.app.include_router(auth_router)
+        self.app.include_router(protected_router)
 
     def configure_lifespan(self):
         @asynccontextmanager # FastAPI expects lifespan to be async context manager. A context manager is an object you can use with 'async with' or 'with' that automatically handles setup and cleanup around a block of code.
