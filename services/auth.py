@@ -1,8 +1,6 @@
 from fastapi import HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from datetime import timedelta
-
 from services.db import DbService
 from services.token import token_service
 from services.redis import redis_service
@@ -12,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.user import UserCredentialsEmail, UserSchema
 from schemas.token import TokenResponse
 
-class UserService:
+class AuthService:
     def __init__(self, db: AsyncSession):
         self.db_service = DbService(db)
 
