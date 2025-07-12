@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     REDIS_DB: int
     ALLOWED_ORIGINS: List[str]
     DATABASE_URL: str
+    MAILERSEND_API_KEY: str
+    MAILERSEND_BASE_URL: str
+    EMAIL_FROM: str
 
     class Config: # Tells pydantic where to look for env variables
         env_file = '.env' # No need for dotenv at all. Uninstal it
