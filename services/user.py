@@ -5,6 +5,7 @@ from datetime import timedelta
 
 from services.db import DbService
 from services.token import token_service
+from services.redis import redis_service
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,16 +43,29 @@ class UserService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already in use"
             )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while signing up"
+        )
+
+    async def token(self, user_credentials: OAuth2PasswordRequestForm)-> TokenResponse:
+        is_blocked = await redis_service.is_blocked(user_credentials.username)
+        if is_blocked:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many attempts"
+            )
         
-    async def token(self, user_credentials: OAuth2PasswordRequestForm):
         is_valid_user = await self.db_service.verify_user(user_credentials.username, user_credentials.password)
         if is_valid_user:
             access_token = token_service.create_access_token(
                 username=user_credentials.username,
-                expires_delta=timedelta(minutes=15)
+                expires_minutes=15
             )
+            await redis_service.reset_attempts(user_credentials.username)
             return TokenResponse(access_token=access_token, token_type='bearer')
 
+        await redis_service.register_attempt(user_credentials.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
