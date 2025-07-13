@@ -6,13 +6,15 @@ from services.reset import ResetService
 
 from dependencies.db import get_db
 
-from schemas.email import Email
+from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
+class Email(BaseModel):
+    email: EmailStr
 
 @router.post('/password-reset')
-async def reset_password(
+async def send_reset_password_email(
     email: Email,
     db: AsyncSession = Depends(get_db)
 ): 
-    return await ResetService(db).reset_password(email.email)
+    return await ResetService(db).request_password_reset(email.email)
