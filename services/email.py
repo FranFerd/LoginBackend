@@ -1,11 +1,13 @@
 import yagmail
 from configs.app_settings import settings
 
+from utils.email_contents import email_contents
+
 class EmailService:
     def __init__(self):
         self.yag = yagmail.SMTP(settings.YAGMAIL_MY_EMAIL)
 
-    def _send_email(self, to: str, subject: str, contents: str) -> None:
+    def _send_email(self, to: str, subject: str, contents: str) -> None: # Turn VPN off before sending
         try:
             self.yag.send(
                 to=to,
@@ -15,32 +17,22 @@ class EmailService:
         except Exception as e:
             raise e
 
-    def send_password_reset_email(self, email: str) -> None: # Turn VPN off before sending email
+    def send_password_reset_email(self, email: str, username: str, token: str) -> None:
+        text_fallback = email_contents.get_plain_text_password_reset(username, token)
+        html_content = email_contents.get_html_password_reset(username, token)
         self._send_email(
             email,
             subject="Password reset",
-            contents="Here's the link to reset your password"
+            contents=[text_fallback, html_content]
         )
 
-    def send_email_confirm(self, email: str) -> None: # Add hello, username
-        code = "123456"
-        html_content = f"""
-            <html>
-            <body style="font-family: Arial, sans-serif; line-height: 1.5;">
-                <h2 style="color: #4A90E2;">Email Verification Code</h2>
-                <h3>Hello, </h3>
-                <h4>Use the following <strong>verification code</strong> to complete your sign-up:</h4>
-                <h1>{code}</h1>
-                <h4>This code will expire in 10 minutes.</h4>
-                <h4>Thanks,<br>Login Project</h4>
-            </body>
-            </html>
-            """
-
-        self.yag.send(
+    def send_email_confirm(self, email: str, username: str) -> None: # Add hello, username
+        text_fallback = email_contents.get_plain_text_email_confirm(username)
+        html_content = email_contents.get_html_email_confirm(username)
+        self._send_email(
             email,
             subject="Email confirmation",
-            contents=html_content
+            contents=[text_fallback, html_content]
         )
         
 email_service = EmailService()
