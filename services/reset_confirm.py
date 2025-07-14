@@ -31,10 +31,14 @@ class ResetConfirmService:
         except Exception as e:
             raise e
             
-    async def request_password_reset(self, user_email: str, username: str) -> None:
+    async def request_password_reset(self, user_email: str) -> None:
+
         token = token_service.create_access_token(username, 15)
         redis_service.store_password_reset_token(username, token, 15)
         await self._request_email(user_email, email_service.send_password_reset_email, username, token)
     
     async def request_email_confirm(self, user_email: str, username: str) -> None:
         await self._request_email(user_email, email_service.send_email_confirm, username)
+
+    async def reset_password(username: str, new_password: str, db: AsyncSession):
+        await token_service.validate_token_from_redis(username, )
