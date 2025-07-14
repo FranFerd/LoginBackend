@@ -6,22 +6,29 @@ from services.reset_confirm import ResetConfirmService
 
 from dependencies.db import get_db
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 router = APIRouter()
-class Email(BaseModel):
-    email: EmailStr
+class UsernameEmail(BaseModel):
+    email: EmailStr = Field(max_length=254)
+    username: str = Field(max_length=12)
 
 @router.post('/password-reset')
 async def send_reset_password_email(
-    email: Email,
+    username_and_email: UsernameEmail,
     db: AsyncSession = Depends(get_db)
 ): 
-    return await ResetConfirmService(db).request_password_reset(email.email)
+    return await ResetConfirmService(db).request_password_reset(
+        username_and_email.email, 
+        username_and_email.username
+    )
 
 @router.post('/email-confirm')
 async def send_confirm_email(
-    email: Email,
+    username_and_email: UsernameEmail,
     db: AsyncSession = Depends(get_db)
 ):
-    return await ResetConfirmService(db).request_email_confirm(email.email)
+    return await ResetConfirmService(db).request_email_confirm(
+        username_and_email.email, 
+        username_and_email.username
+    )

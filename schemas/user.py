@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 
 class UserSchema(BaseModel):
@@ -13,6 +13,6 @@ class UserSchema(BaseModel):
     }                           # It is Needed to pass models with model_validate(orm_obj)
 
 class UserCredentialsEmail(BaseModel):
-    username: str
-    password: str
-    email: EmailStr
+    username: str = Field(max_length=12)
+    password: str = Field(max_length=30)
+    email: EmailStr = Field(max_length=254)
