@@ -1,11 +1,15 @@
+from logger import logger
+
 from fastapi import HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.db import DbService
 from services.token import token_service
 from services.redis import redis_service
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from models.user import UserModel
 
 from schemas.user import UserCredentialsEmail, UserSchema
 from schemas.token import TokenResponse
@@ -31,16 +35,24 @@ class AuthService:
                     detail="Username and email already in use"
                 )
         
-        user = existing_users[0] 
+        user: UserModel = existing_users[0] 
         if user.username == user_credentials_email.username:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, 
                 detail="Username already exists")
+        
         if user.email == user_credentials_email.email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already in use"
             )
+        
+        logger.error(
+            "Signup reached unexpected state."
+            f"Existing users: {existing_users}",
+            f"Input username: {user_credentials_email.username}, "
+            f"Input email: {user_credentials_email.email}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while signing up"
