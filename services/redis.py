@@ -4,7 +4,6 @@ from configs.app_settings import settings
 
 from datetime import timedelta
 
-
 class RedisService:
 
     MAX_ATTEMPTS = 5
@@ -21,7 +20,7 @@ class RedisService:
         return f"login_fail:{username}"
     
     def _get_key_password_reset_token(self, username: str) -> str:
-        return f"token:{username}"
+        return f"password_reset_token:{username}"
     
     async def register_attempt(self, username: str) -> None:
         key = self._get_key_login_fail(username)
@@ -40,9 +39,9 @@ class RedisService:
         key = self._get_key_login_fail(username)
         await self.client.delete(key)
 
-    async def store_password_reset_token(self, username: str, token: str, minutes: int) -> None:
+    async def store_password_reset_token(self, username: str, token: str, expires_minutes: int) -> None:
         key = self._get_key_password_reset_token(username)
-        await self.client.setex(key, timedelta(minutes=minutes), token) # No need to json.dumps plain string
+        await self.client.setex(key, timedelta(minutes=expires_minutes), token) # No need to json.dumps plain string
 
     async def get_password_reset_token(self, username: str) -> Optional[str]:
         key = self._get_key_password_reset_token(username)

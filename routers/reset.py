@@ -5,10 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from services.reset_confirm import ResetConfirmService
 
 from dependencies.db import get_db
-from dependencies.token import decode_token
+from dependencies.token import get_token_from_header
 
 from schemas.user import Email, PasswordResetRequest
-from schemas.token import TokenSub
+from schemas.token import TokenResponse
 
 router = APIRouter()
 
@@ -33,8 +33,11 @@ async def send_reset_password_email(
 
 @router.post('/password-reset')
 async def reset_password(
-    new_password: str = PasswordResetRequest,
-    password_reset_token: TokenSub = Depends(decode_token),
+    new_password_request: PasswordResetRequest,
+    password_reset_token: TokenResponse = Depends(get_token_from_header),
     db: AsyncSession = Depends(get_db)
 ):
-    pass
+    return await ResetConfirmService(db).reset_password(
+        new_password_request, 
+        password_reset_token
+    )
