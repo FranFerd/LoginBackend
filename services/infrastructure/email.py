@@ -1,7 +1,7 @@
 import yagmail
 from configs.app_settings import settings
-
 from utils.email_contents import email_contents
+from logger.logger import logger
 
 class EmailService:
     def __init__(self):
@@ -15,6 +15,7 @@ class EmailService:
                 contents=contents
             )
         except Exception as e:
+            logger.exception("Unexpected error while sending email")
             raise e
 
     def send_password_reset_email(self, email: str, username: str, token: str) -> None:

@@ -1,4 +1,4 @@
-from logger import logger
+from logger.logger import logger
 
 from fastapi import HTTPException, status
 
@@ -10,6 +10,7 @@ from sqlalchemy import or_, update
 from models.user import UserModel
 
 from schemas.user import UserCredentialsEmail
+from schemas.exceptions import DatabaseError, UserAlreadyExistsError, UserNotFound
 
 from security.password_hashing import Argon2Ph
 
@@ -17,8 +18,12 @@ from typing import Optional, List
 
 class DbService:
     def __init__(self, db: AsyncSession):
-        self.db = db
-
+        try:
+            self.db = db
+            logger.info("DB service initialized successfully")
+        except Exception:
+            logger.critical("Failed to initialize DB service")
+            raise # 'raise' is better that 'raise e' because traceback starts where the error happened, not where it was caught (raise e)
     async def get_user_by_username_or_email(
         self, 
         username: Optional[str] = None, 
@@ -26,6 +31,7 @@ class DbService:
     ) -> List[UserModel]:
         
         if username is None and email is None:
+            logger.warning("Username or email not provided")
             raise ValueError("At least one of 'username' or 'email' must be provided")
         
         try:
@@ -39,12 +45,10 @@ class DbService:
                 select(UserModel).where(or_(*conditions)) # or_ doesn't take list as argument. Unpack the list with unpacking operator *
             )
             return result.scalars().all() # Returns a list of ORM objects 
-        except Exception:
+        except Exception as e:
             await self.db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Unexpected error while fetching user"
-            )
+            logger.exception("Unexpected error while fetching user")
+            raise DatabaseError("Failed to get user") from e
         
     async def insert_user(
         self, 
@@ -57,20 +61,16 @@ class DbService:
         try:
             self.db.add(new_user)
             await self.db.commit()
-            await self.db.refresh(new_user)
+            await self.db.refresh(new_user) # after adding and commit, new_user may not have all fields populated (auto-generated id, default values Timestamp)
             return new_user
-        except IntegrityError:
+        except IntegrityError as e: # Occurs when constraints are violated (unique, not null, fks)
             await self.db.rollback() # Always rollback on error
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail="Username or email already exist"
-            )
-        except Exception:
+            logger.exception(f"IntegrityError while inserting user: username={user.username}, email={user.email}")
+            raise UserAlreadyExistsError("Username or email already in use") from e
+        except Exception as e:
             await self.db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Unexpected error while creating user"
-            )
+            logger.exception("Unexpected error while creating user")
+            raise DatabaseError("Unexpected database error during user insert") from e
         
     async def verify_user(
         self, 
@@ -85,15 +85,14 @@ class DbService:
             hashed_password = result.scalar_one_or_none()
 
             if hashed_password is None:
+                logger.warning(f"Login failed: user not found or password incorrect for '{username}'") # Add {username}?
                 return False
             
             is_valid_password = Argon2Ph().verify_password(hashed_password, password)
             return is_valid_password
-        except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Unexpected error while verifying user"
-            )
+        except Exception as e:
+            logger.exception("Unexpected error while verifying user")
+            raise DatabaseError("Unexpected database error during user verification") from e
     
     async def verify_email(
         self, 
@@ -104,17 +103,16 @@ class DbService:
             result = await self.db.execute(
                 select(UserModel).where(UserModel.email == email)
             )
-            email = result.scalar_one_or_none()
+            user = result.scalar_one_or_none()
 
-            if email is None:
+            if user is None:
+                logger.warning(f"No user found with email '{email}'")
                 return False
             
             return True
-        except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Unexpected error while verifying email"
-            )
+        except Exception as e:
+            logger.exception("Unexpected error while verifying email")
+            raise DatabaseError("Failed to verify email") from e # raise new error from old one
         
     async def update_password(
         self, 
@@ -132,16 +130,12 @@ class DbService:
             result = await self.db.execute(statement)
 
             if result.rowcount == 0:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, 
-                    detail="User not found"
-                )
+                logger.warning(f"User '{username}' not found in DB during password update")
+                raise UserNotFound(f"User '{username} not found'")
             
             await self.db.commit()
+            logger.info(f"Password updated for user '{username}'")
         except Exception as e:
             await self.db.rollback()
             logger.exception("Unexpected error while updating user")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Unexpected error while updating user"
-            )
+            raise DatabaseError("Unexpected database error during password update") from e

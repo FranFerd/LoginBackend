@@ -10,6 +10,7 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+logs/
 build/
 WeatherAPIFastAPIVenv
 develop-eggs/
