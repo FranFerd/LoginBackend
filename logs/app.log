@@ -245,3 +245,11 @@
 {"asctime": "2025-07-19 12:04:18,657", "levelname": "INFO", "module": "db", "message": "Database initialized successfully"}
 {"asctime": "2025-07-19 12:04:18,664", "levelname": "ERROR", "module": "auth", "message": "Signup rejected: username already in use for 'vladislavssa'"}
 {"asctime": "2025-07-19 12:04:42,782", "levelname": "INFO", "module": "main_service", "message": "Server shutting down..."}
+{"asctime": "2025-07-19 12:13:18,645", "levelname": "INFO", "module": "redis", "message": "Redis initialized on port 6379"}
+{"asctime": "2025-07-19 12:13:18,690", "levelname": "INFO", "module": "main_service", "message": "Server starting up..."}
+{"asctime": "2025-07-19 12:13:26,465", "levelname": "INFO", "module": "db", "message": "Database initialized successfully"}
+{"asctime": "2025-07-19 12:13:26,531", "levelname": "INFO", "module": "auth", "message": "User vlad.solovey7s77s7s@gmail.com successfully registered"}
+{"asctime": "2025-07-19 12:14:24,328", "levelname": "INFO", "module": "main_service", "message": "Server shutting down..."}
+{"asctime": "2025-07-19 12:14:25,811", "levelname": "INFO", "module": "redis", "message": "Redis initialized on port 6379"}
+{"asctime": "2025-07-19 12:14:25,858", "levelname": "INFO", "module": "main_service", "message": "Server starting up..."}
+{"asctime": "2025-07-19 12:23:33,273", "levelname": "INFO", "module": "main_service", "message": "Server shutting down..."}

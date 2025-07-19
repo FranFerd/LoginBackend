@@ -10,6 +10,7 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+*.log
 build/
 WeatherAPIFastAPIVenv
 develop-eggs/
@@ -25,5 +26,3 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
-logs
-logs/

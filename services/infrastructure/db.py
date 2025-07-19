@@ -20,7 +20,7 @@ class DbService:
     def __init__(self, db: AsyncSession):
         try:
             self.db = db
-            logger.info("Database initialized successfully")
+            logger.info("DB service initialized successfully")
         except Exception:
             logger.critical("Failed to initialize DB service")
             raise # 'raise' is better that 'raise e' because traceback starts where the error happened, not where it was caught (raise e)
