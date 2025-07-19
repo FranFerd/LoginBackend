@@ -17,8 +17,12 @@ from typing import Optional, List
 
 class DbService:
     def __init__(self, db: AsyncSession):
-        self.db = db
-
+        try:
+            self.db = db
+            logger.info("Database initialized successfully")
+        except Exception:
+            logger.critical("Database initialization failed")
+            raise # 'raise' is better that 'raise e' because traceback starts where the error happened, not where it was caught (raise e)
     async def get_user_by_username_or_email(
         self, 
         username: Optional[str] = None, 
