@@ -26,6 +26,7 @@ class DbService:
     ) -> List[UserModel]:
         
         if username is None and email is None:
+            logger.warning("Username or email not provided")
             raise ValueError("At least one of 'username' or 'email' must be provided")
         
         try:
@@ -41,6 +42,7 @@ class DbService:
             return result.scalars().all() # Returns a list of ORM objects 
         except Exception:
             await self.db.rollback()
+            logger.exception("Unexpected error while fetching user")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Unexpected error while fetching user"
@@ -61,12 +63,14 @@ class DbService:
             return new_user
         except IntegrityError:
             await self.db.rollback() # Always rollback on error
+            logger.exception(f"IntegrityError while inserting user: username={user.username}, email={user.email}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, 
                 detail="Username or email already exist"
             )
         except Exception:
             await self.db.rollback()
+            logger.exception("Unexpected error while creating user")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Unexpected error while creating user"
@@ -85,11 +89,13 @@ class DbService:
             hashed_password = result.scalar_one_or_none()
 
             if hashed_password is None:
+                logger.warning(f"Login failed: user not found or password incorrect for '{username}'") # Add {username}?
                 return False
             
             is_valid_password = Argon2Ph().verify_password(hashed_password, password)
             return is_valid_password
         except Exception:
+            logger.exception("Unexpected error while verifying user")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Unexpected error while verifying user"
@@ -104,13 +110,15 @@ class DbService:
             result = await self.db.execute(
                 select(UserModel).where(UserModel.email == email)
             )
-            email = result.scalar_one_or_none()
+            user = result.scalar_one_or_none()
 
-            if email is None:
+            if user is None:
+                logger.warning(f"No user found with email '{email}'")
                 return False
             
             return True
         except Exception:
+            logger.exception("Unexpected error while verifying email")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Unexpected error while verifying email"
@@ -132,13 +140,14 @@ class DbService:
             result = await self.db.execute(statement)
 
             if result.rowcount == 0:
+                logger.warning(f"User '{username}' not found")
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND, 
                     detail="User not found"
                 )
             
             await self.db.commit()
-        except Exception as e:
+        except Exception:
             await self.db.rollback()
             logger.exception("Unexpected error while updating user")
             raise HTTPException(
