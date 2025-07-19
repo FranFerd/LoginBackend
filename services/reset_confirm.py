@@ -8,17 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dependencies.token import decode_token
 
-from services.db import DbService
-from services.email import email_service
-from services.token import token_service
-from services.redis import redis_service
+from services.infrastructure.db import DbService
+from services.infrastructure.email import email_service
+from services.infrastructure.token import token_service
+from services.infrastructure.redis import redis_service
 
 from schemas.user import PasswordResetRequest
 from schemas.token import TokenResponse, TokenSub
 
 class ResetConfirmService:
     def __init__(self, db: AsyncSession):
-        self.db_service = DbService(db)
+        self.db_service = DbService(db) # If db init fails, this will raise
 
     async def _request_email(
         self, 
@@ -28,7 +28,7 @@ class ResetConfirmService:
     ) -> None: 
         
         is_valid_email = await self.db_service.verify_email(user_email)
-        if not is_valid_email:
+        if not is_valid_email: # No logging here. verify_email already does it
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid email address"

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from configs.app_settings import settings
 
-from services.redis import redis_service
+from services.infrastructure.redis import redis_service
 
 class TokenService:
     def create_access_token(self, username: str, expires_minutes: int) -> str:

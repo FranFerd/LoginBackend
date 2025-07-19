@@ -25,3 +25,5 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+logs
+logs/

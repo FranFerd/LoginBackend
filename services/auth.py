@@ -5,9 +5,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.db import DbService
-from services.token import token_service
-from services.redis import redis_service
+from services.infrastructure.db import DbService
+from services.infrastructure.token import token_service
+from services.infrastructure.redis import redis_service
 
 from models.user import UserModel
 
