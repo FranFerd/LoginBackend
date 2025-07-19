@@ -6,3 +6,9 @@ class UserAlreadyExistsError(Exception):
 
 class UserNotFound(Exception):
     pass
+
+class InvalidTokenError(Exception):
+    pass
+
+class TokenNotFoundError(Exception):
+    pass

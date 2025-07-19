@@ -2,7 +2,7 @@ from typing import Optional
 
 from redis.asyncio import Redis
 from configs.app_settings import settings
-from logger import logger
+from logger.logger import logger
 
 from datetime import timedelta
 

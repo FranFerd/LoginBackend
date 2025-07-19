@@ -1,5 +1,5 @@
 import asyncio
-from logger import logger
+from logger.logger import logger
 
 from typing import Callable
 
@@ -66,7 +66,7 @@ class ResetConfirmService:
         
         try:
             username: TokenSub = decode_token(password_reset_token.access_token)
-            await token_service.validate_token_from_redis(
+            await token_service.validate_password_reset_token_from_redis(
                 username.username, 
                 password_reset_token.access_token
             )

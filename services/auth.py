@@ -1,4 +1,4 @@
-from logger import logger
+from logger.logger import logger
 
 from fastapi import HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -13,6 +13,7 @@ from models.user import UserModel
 
 from schemas.user import UserCredentialsEmail, UserSchema
 from schemas.token import TokenResponse
+from schemas.exceptions import DatabaseError, UserAlreadyExistsError, UserNotFound
 
 class AuthService:
     def __init__(self, db: AsyncSession):
@@ -40,7 +41,7 @@ class AuthService:
             
             user: UserModel = existing_users[0] 
             if user.username == user_credentials_email.username:
-                logger.warning(f"Signup rejected: username already in use for {user_credentials_email.username}")
+                logger.error(f"Signup rejected: username already in use for '{user_credentials_email.username}'")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST, 
                     detail="Username already exists")
@@ -51,7 +52,7 @@ class AuthService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Email already in use"
                 )
-        except Exception:
+        except DatabaseError:
             logger.exception(
                 f"Unexpected error during signup for {user_credentials_email.username} / {user_credentials_email.email}"
             )

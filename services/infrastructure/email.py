@@ -1,7 +1,7 @@
 import yagmail
 from configs.app_settings import settings
 from utils.email_contents import email_contents
-from logger import logger
+from logger.logger import logger
 
 class EmailService:
     def __init__(self):

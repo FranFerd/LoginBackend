@@ -1,6 +1,7 @@
-import logging
+import logging, os
 from pythonjsonlogger import jsonlogger
-import os
+from logger.telegram_log_bot import TelegramHandler, MarkdownFormatter
+from configs.app_settings import settings
 
 LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -20,7 +21,14 @@ file_handler = logging.FileHandler(filename=f"{LOG_DIR}/app.log")
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(formatter)
 
+telegram_handler = TelegramHandler(
+    bot_token=settings.ERRORLOGGERULTRAPREMIUSBOT_TOKEN,
+    chat_id=settings.ERRORLOGGERULTRAPREMIUSBOT_CHAT_ID
+)
+telegram_handler.setLevel(logging.ERROR)
+telegram_handler.setFormatter(MarkdownFormatter())
 
 if not logger.hasHandlers():
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
+    logger.addHandler(telegram_handler)

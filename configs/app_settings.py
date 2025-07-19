@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: List[str]
     DATABASE_URL: str
     YAGMAIL_MY_EMAIL: str
+    ERRORLOGGERULTRAPREMIUSBOT_TOKEN: str
+    ERRORLOGGERULTRAPREMIUSBOT_BASE_URL: str
+    ERRORLOGGERULTRAPREMIUSBOT_CHAT_ID: str
+    
 
     class Config: # Tells pydantic where to look for env variables
         env_file = '.env' # No need for dotenv at all. Uninstal it

@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from configs.cors_config import add_cors_middleware
 from configs.create_tables import create_tables
 
-from logger import logger
+from logger.logger import logger
 
 from routers.auth import router as auth_router
 from routers.protected import router as protected_router
