@@ -41,7 +41,7 @@ class AuthService:
             
             user: UserModel = existing_users[0] 
             if user.username == user_credentials_email.username:
-                logger.error(f"Signup rejected: username already in use for '{user_credentials_email.username}'")
+                logger.warning(f"Signup rejected: username already in use for '{user_credentials_email.username}'")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST, 
                     detail="Username already exists")
