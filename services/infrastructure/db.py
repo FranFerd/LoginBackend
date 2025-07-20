@@ -30,10 +30,6 @@ class DbService:
         email: Optional[str] = None
     ) -> List[UserModel]:
         
-        if username is None and email is None:
-            logger.warning("Username or email not provided")
-            raise ValueError("At least one of 'username' or 'email' must be provided")
-        
         try:
             conditions = []
             if username:

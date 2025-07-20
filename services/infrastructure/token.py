@@ -1,12 +1,13 @@
-from fastapi import HTTPException, status
-from jose import jwt
+from logger.logger import logger
+
+from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 
 from configs.app_settings import settings
 
 from services.infrastructure.redis import redis_service
 
-from schemas.exceptions import InvalidTokenError, TokenNotFoundError
+from schemas.exceptions import InvalidTokenError, TokenNotFoundError, TokenCreationError
 
 class TokenService:
     def create_access_token(self, username: str, expires_minutes: int) -> str:
@@ -15,7 +16,15 @@ class TokenService:
             "sub": username,
             "exp": expires_at,
         }
-        return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.ALGORITHM)
+
+        try:
+            token = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.ALGORITHM)
+            return token
+        
+        except JWTError as e:
+            logger.exception(f"Failed to create JWT token for user {username}")
+            raise TokenCreationError from e     
+         
     
     async def validate_password_reset_token_from_redis(self, username: str, token_to_validate: str):
         stored_token = await redis_service.get_password_reset_token(username)
