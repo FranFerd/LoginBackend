@@ -12,3 +12,6 @@ class InvalidTokenError(Exception):
 
 class TokenNotFoundError(Exception):
     pass
+
+class TokenCreationError(Exception):
+    pass

@@ -13,7 +13,11 @@ from models.user import UserModel
 
 from schemas.user import UserCredentialsEmail, UserSchema
 from schemas.token import TokenResponse
-from schemas.exceptions import DatabaseError, UserAlreadyExistsError, UserNotFound
+from schemas.exceptions import (
+    DatabaseError, 
+    UserAlreadyExistsError,   
+    TokenCreationError
+)
 
 class AuthService:
     def __init__(self, db: AsyncSession):
@@ -25,13 +29,9 @@ class AuthService:
 
             existing_users = await self.db_service.get_user_by_username_or_email(
                 user_credentials_email.username, 
-                user_credentials_email.email)
+                user_credentials_email.email
+            )
             
-            if not existing_users:
-                new_user = await self.db_service.insert_user(user_credentials_email)
-                logger.info(f"User {user_credentials_email.email} successfully registered")
-                return UserSchema.model_validate(new_user)
-
             if len(existing_users) == 2:
                 logger.warning(f"Signup rejected: username and email already in use for {user_credentials_email.email}")
                 raise HTTPException(
@@ -39,19 +39,35 @@ class AuthService:
                         detail="Username and email already in use"
                     )
             
-            user: UserModel = existing_users[0] 
-            if user.username == user_credentials_email.username:
-                logger.warning(f"Signup rejected: username already in use for '{user_credentials_email.username}'")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST, 
-                    detail="Username already exists")
+            elif len(existing_users) == 1:
+                user: UserModel = existing_users[0] 
+                if user.username == user_credentials_email.username:
+                    logger.warning(f"Signup rejected: username already in use for '{user_credentials_email.username}'")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST, 
+                        detail="Username already exists")
+                
+                if user.email == user_credentials_email.email:
+                    logger.warning(f"Signup rejected: email already in use for {user_credentials_email.email}")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Email already in use"
+                    )
+                
+            elif not existing_users :
+                new_user = await self.db_service.insert_user(user_credentials_email)
+                logger.info(f"User {user_credentials_email.email} successfully registered")
+                return UserSchema.model_validate(new_user)
             
-            if user.email == user_credentials_email.email:
-                logger.warning(f"Signup rejected: email already in use for {user_credentials_email.email}")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Email already in use"
-                )
+            else:
+                raise DatabaseError("Unexpected number of users found")
+            
+        except UserAlreadyExistsError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username or email already in use"
+            )
+        
         except DatabaseError:
             logger.exception(
                 f"Unexpected error during signup for {user_credentials_email.username} / {user_credentials_email.email}"
@@ -64,6 +80,7 @@ class AuthService:
     async def token(self, user_credentials: OAuth2PasswordRequestForm)-> TokenResponse:
         try:
             logger.info(f"Login attempt for username: {user_credentials.username}")
+
             is_blocked = await redis_service.is_blocked(user_credentials.username)
             if is_blocked:
                 raise HTTPException(
@@ -81,14 +98,15 @@ class AuthService:
                 await redis_service.reset_attempts(user_credentials.username)
                 return TokenResponse(access_token=access_token, token_type='bearer')
 
+            # Invalid credentials
             await redis_service.register_attempt(user_credentials.username)
-
-            logger.warning(f"Failed login: invalid password for user {user_credentials.username}")
+            logger.warning(f"Failed login attempt for username: {user_credentials.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials"
+                detail="Invalid username or password"
             )
-        except Exception:
+        
+        except (TokenCreationError, DatabaseError):
             logger.exception(f"Unexpected error during token generation")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

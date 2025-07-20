@@ -13,9 +13,9 @@ class UserSchema(BaseModel):
     }                           # It is Needed to pass models with model_validate(orm_obj)
 
 class UserCredentialsEmail(BaseModel):
-    username: str = Field(..., max_length=12) # '...' is required to make it not optional when using Field. Without Field, fields are required by default
-    password: str = Field(..., max_length=30)
-    email: EmailStr = Field(..., max_length=254)
+    username: str = Field(..., min_length=3, max_length=12) # '...' is required to make it not optional when using Field. Without Field, fields are required by default
+    password: str = Field(..., min_length=6, max_length=30)
+    email: EmailStr = Field(..., min_length=5, max_length=254)
 
 class Email(BaseModel):
     email: EmailStr = Field(..., max_length=254)

@@ -15,6 +15,7 @@ from services.infrastructure.redis import redis_service
 
 from schemas.user import PasswordResetRequest
 from schemas.token import TokenResponse, TokenSub
+from schemas.exceptions import DatabaseError, TokenNotFoundError, InvalidTokenError
 
 class ResetConfirmService:
     def __init__(self, db: AsyncSession):
@@ -27,28 +28,36 @@ class ResetConfirmService:
         *args: str
     ) -> None: 
         
-        is_valid_email = await self.db_service.verify_email(user_email)
-        if not is_valid_email: # No logging here. verify_email already does it
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid email address"
-            )
-        
         loop = asyncio.get_running_loop() # sending email is sync. executor runs blocking (synchronous) code in a separate thread without blocking async
-        await loop.run_in_executor(None, func, user_email, *args) 
+        await loop.run_in_executor(None, func, user_email, *args) # user_emila and *args are arguments passed to func
             
     async def request_password_reset(
         self, 
         user_email: str
     ) -> None:
         
-        users = await self.db_service.get_user_by_username_or_email(email=user_email)
-        user = users[0] # users is a list of one
-        username = user.username
-        token = token_service.create_access_token(username, expires_minutes=30)
+        try:
+            users = await self.db_service.get_user_by_username_or_email(email=user_email)
+            if len(users) == 0:
+                logger.exception(f"Password reset request rejected for mail: {user_email}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid email address"
+                )
+            
+            user = users[0] # users is a list of one
+            username = user.username
+            token = token_service.create_access_token(username, expires_minutes=30)
 
-        await redis_service.store_password_reset_token(username, token, expires_minutes=30)
-        await self._request_email(user_email, email_service.send_password_reset_email, username, token)
+            await redis_service.store_password_reset_token(username, token, expires_minutes=30)
+            await self._request_email(user_email, email_service.send_password_reset_email, username, token)
+        
+        except DatabaseError:
+            logger.exception("Unexpected error while requesting password reset email")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unexpected error while requesting password reset email"
+            )
     
     async def request_email_confirm(
         self, 
@@ -71,13 +80,22 @@ class ResetConfirmService:
                 password_reset_token.access_token
             )
             await self.db_service.update_password(username.username, new_password_request.new_password)
-        except HTTPException as e:
-            logger.warning(f"HTTPException during password reset: {e.detail}")
-            raise
-        except Exception as e:
+
+        except InvalidTokenError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token"
+            )
+        
+        except TokenNotFoundError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired or doesn't exist"
+            )
+        
+        except Exception:
             logger.exception("Unexpected error during password reset")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Unexpected error during password reset"
             )
-        return 'Password changed successfully'

@@ -30,10 +30,6 @@ class DbService:
         email: Optional[str] = None
     ) -> List[UserModel]:
         
-        if username is None and email is None:
-            logger.warning("Username or email not provided")
-            raise ValueError("At least one of 'username' or 'email' must be provided")
-        
         try:
             conditions = []
             if username:
@@ -93,26 +89,6 @@ class DbService:
         except Exception as e:
             logger.exception("Unexpected error while verifying user")
             raise DatabaseError("Unexpected database error during user verification") from e
-    
-    async def verify_email(
-        self, 
-        email: str
-    ) -> bool:
-        
-        try:
-            result = await self.db.execute(
-                select(UserModel).where(UserModel.email == email)
-            )
-            user = result.scalar_one_or_none()
-
-            if user is None:
-                logger.warning(f"No user found with email '{email}'")
-                return False
-            
-            return True
-        except Exception as e:
-            logger.exception("Unexpected error while verifying email")
-            raise DatabaseError("Failed to verify email") from e # raise new error from old one
         
     async def update_password(
         self, 
