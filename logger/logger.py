@@ -7,7 +7,7 @@ LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO) # Sets the minimum severity level of log messages this logger will process. DEBUG is the lowest level
+logger.setLevel(logging.DEBUG) # Sets the minimum severity level of log messages this logger will process. DEBUG is the lowest level
 
 formatter = jsonlogger.JsonFormatter(
     "[%(asctime)s] %(levelname)s in %(module)s: %(message)s"

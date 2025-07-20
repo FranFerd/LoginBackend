@@ -18,7 +18,7 @@ class TokenService:
         }
 
         try:
-            token = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.ALGORITHM)
+            token = jwt.encode(to_encode, settings.JWT_SECRET, settings.ALGORITHM)
             return token
         
         except JWTError as e:
