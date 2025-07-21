@@ -1,7 +1,5 @@
 from logger.logger import logger
 
-from fastapi import HTTPException, status
-
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.future import select
@@ -12,18 +10,21 @@ from models.user import UserModel
 from schemas.user import UserCredentialsEmail
 from schemas.exceptions import DatabaseError, UserAlreadyExistsError, UserNotFound
 
-from security.password_hashing import Argon2Ph
+from security.password_hashing import argon2_ph
 
 from typing import Optional, List
 
 class DbService:
     def __init__(self, db: AsyncSession):
+
         try:
             self.db = db
             logger.info("DB service initialized successfully")
+
         except Exception:
             logger.critical("Failed to initialize DB service")
             raise # 'raise' is better that 'raise e' because traceback starts where the error happened, not where it was caught (raise e)
+
     async def get_user_by_username_or_email(
         self, 
         username: Optional[str] = None, 
@@ -41,6 +42,7 @@ class DbService:
                 select(UserModel).where(or_(*conditions)) # or_ doesn't take list as argument. Unpack the list with unpacking operator *
             )
             return result.scalars().all() # Returns a list of ORM objects 
+        
         except Exception as e:
             await self.db.rollback()
             logger.exception("Unexpected error while fetching user")
@@ -51,7 +53,7 @@ class DbService:
         user: UserCredentialsEmail
     ) -> UserModel:
         
-        password_hashed = Argon2Ph().hash_password(user.password)
+        password_hashed = argon2_ph.hash_password(user.password)
         new_user = UserModel(username=user.username, password_hashed=password_hashed, email=user.email)
 
         try:
@@ -59,10 +61,12 @@ class DbService:
             await self.db.commit()
             await self.db.refresh(new_user) # after adding and commit, new_user may not have all fields populated (auto-generated id, default values Timestamp)
             return new_user
+        
         except IntegrityError as e: # Occurs when constraints are violated (unique, not null, fks)
             await self.db.rollback() # Always rollback on error
-            logger.exception(f"IntegrityError while inserting user: username={user.username}, email={user.email}")
+            logger.info(f"IntegrityError while inserting user: username={user.username}, email={user.email}")
             raise UserAlreadyExistsError("Username or email already in use") from e
+        
         except Exception as e:
             await self.db.rollback()
             logger.exception("Unexpected error while creating user")
@@ -81,11 +85,12 @@ class DbService:
             hashed_password = result.scalar_one_or_none()
 
             if hashed_password is None:
-                logger.warning(f"Login failed: user not found or password incorrect for '{username}'") # Add {username}?
+                logger.info(f"Login failed: user not found or password incorrect for '{username}'")
                 return False
             
-            is_valid_password = Argon2Ph().verify_password(hashed_password, password)
+            is_valid_password = argon2_ph.verify_password(hashed_password, password)
             return is_valid_password
+        
         except Exception as e:
             logger.exception("Unexpected error while verifying user")
             raise DatabaseError("Unexpected database error during user verification") from e
@@ -95,7 +100,7 @@ class DbService:
         username: str, 
         new_password: str
     ) -> None:
-        new_password_hashed = Argon2Ph().hash_password(new_password)
+        new_password_hashed = argon2_ph.hash_password(new_password)
 
         try:
             statement = (
@@ -106,11 +111,12 @@ class DbService:
             result = await self.db.execute(statement)
 
             if result.rowcount == 0:
-                logger.warning(f"User '{username}' not found in DB during password update")
+                logger.info(f"User '{username}' not found in DB during password update")
                 raise UserNotFound(f"User '{username} not found'")
             
             await self.db.commit()
             logger.info(f"Password updated for user '{username}'")
+
         except Exception as e:
             await self.db.rollback()
             logger.exception("Unexpected error while updating user")

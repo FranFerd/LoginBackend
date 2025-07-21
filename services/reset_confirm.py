@@ -15,7 +15,7 @@ from services.infrastructure.redis import redis_service
 
 from schemas.user import PasswordResetRequest
 from schemas.token import TokenResponse, TokenSub
-from schemas.exceptions import DatabaseError, TokenNotFoundError, InvalidTokenError
+from schemas.exceptions import DatabaseError, TokenNotFoundError, InvalidTokenError, EmailSendError
 
 class ResetConfirmService:
     def __init__(self, db: AsyncSession):
@@ -39,7 +39,7 @@ class ResetConfirmService:
         try:
             users = await self.db_service.get_user_by_username_or_email(email=user_email)
             if len(users) == 0:
-                logger.exception(f"Password reset request rejected for mail: {user_email}")
+                logger.info(f"Unknown email: password reset request rejected for mail: {user_email}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid email address"
@@ -52,7 +52,7 @@ class ResetConfirmService:
             await redis_service.store_password_reset_token(username, token, expires_minutes=30)
             await self._request_email(user_email, email_service.send_password_reset_email, username, token)
         
-        except DatabaseError:
+        except (DatabaseError, EmailSendError):
             logger.exception("Unexpected error while requesting password reset email")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -61,12 +61,18 @@ class ResetConfirmService:
     
     async def request_email_confirm(
         self, 
-        user_email: str, 
-        username: str
+        user_email: str
     ) -> None:
         
-        await self._request_email(user_email, email_service.send_email_confirm, username)
+        try:
+            await self._request_email(user_email, email_service.send_email_confirm)
 
+        except EmailSendError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unexpected error while requesting email confirm"
+            )
+        
     async def reset_password(
         self, 
         new_password_request: PasswordResetRequest, 
@@ -93,7 +99,7 @@ class ResetConfirmService:
                 detail="Token expired or doesn't exist"
             )
         
-        except Exception:
+        except DatabaseError:
             logger.exception("Unexpected error during password reset")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

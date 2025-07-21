@@ -12,6 +12,8 @@ class Argon2Ph:
             return self.ph.verify(hash=hashed_password, password=password)
         except:
             return False
+        
+argon2_ph = Argon2Ph()
 # Another way to do it. Supports multiple schemes -> switching is easy. Use the first, if committed to Argon2 only.
 # from passlib.context import CryptContext
 

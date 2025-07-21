@@ -24,14 +24,15 @@ class TokenService:
         except JWTError as e:
             logger.exception(f"Failed to create JWT token for user {username}")
             raise TokenCreationError from e     
-         
     
     async def validate_password_reset_token_from_redis(self, username: str, token_to_validate: str):
         stored_token = await redis_service.get_password_reset_token(username)
         if stored_token is None:
+            logger.info(f"No password reset token found for user '{username}'")
             raise TokenNotFoundError("Token expired or doesn't exist")
         
         if token_to_validate != stored_token:
+            logger.info(f"Password reset token for user '{username} doesn't match provided token'")
             raise InvalidTokenError("Invalid token")
 
 token_service = TokenService()

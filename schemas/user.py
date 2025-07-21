@@ -1,5 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator, field_validator
 from datetime import datetime
+
+from utils.email_validator import validate_email_length
 
 class UserSchema(BaseModel):
     id: int
@@ -15,10 +17,30 @@ class UserSchema(BaseModel):
 class UserCredentialsEmail(BaseModel):
     username: str = Field(..., min_length=3, max_length=12) # '...' is required to make it not optional when using Field. Without Field, fields are required by default
     password: str = Field(..., min_length=6, max_length=30)
-    email: EmailStr = Field(..., min_length=5, max_length=254)
+    email: EmailStr
+
+    @field_validator('email')
+    @classmethod # Needed for Pydantic firld validation
+    def check_email_length(cls, v):
+        return validate_email_length(v)
+
+class UserCredentialsEmailHashed(BaseModel):
+    username: str = Field(..., min_length=3, max_length=12) # '...' is required to make it not optional when using Field. Without Field, fields are required by default
+    hashed_password: str = Field(..., min_length=6, max_length=255)
+    email: EmailStr
+
+    @field_validator('email')
+    @classmethod # Needed for Pydantic firld validation
+    def check_email_length(cls, v):
+        return validate_email_length(v)
 
 class Email(BaseModel):
-    email: EmailStr = Field(..., max_length=254)
+    address: EmailStr
+
+    @field_validator('address')
+    @classmethod # Needed for Pydantic firld validation
+    def check_email_length(cls, v):
+        return validate_email_length(v)
 
 class PasswordResetRequest(BaseModel):
     new_password: str = Field(..., min_length=6, max_length=30)
