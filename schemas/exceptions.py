@@ -15,3 +15,6 @@ class TokenNotFoundError(Exception):
 
 class TokenCreationError(Exception):
     pass
+
+class EmailSendError(Exception):
+    pass

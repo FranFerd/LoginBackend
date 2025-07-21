@@ -33,7 +33,7 @@ class AuthService:
             )
             
             if len(existing_users) == 2:
-                logger.warning(f"Signup rejected: username and email already in use for {user_credentials_email.email}")
+                logger.info(f"Signup rejected: username and email already in use for {user_credentials_email.email}")
                 raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST, 
                         detail="Username and email already in use"
@@ -42,13 +42,13 @@ class AuthService:
             elif len(existing_users) == 1:
                 user: UserModel = existing_users[0] 
                 if user.username == user_credentials_email.username:
-                    logger.warning(f"Signup rejected: username already in use for '{user_credentials_email.username}'")
+                    logger.info(f"Signup rejected: username already in use for '{user_credentials_email.username}'")
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST, 
                         detail="Username already exists")
                 
                 if user.email == user_credentials_email.email:
-                    logger.warning(f"Signup rejected: email already in use for {user_credentials_email.email}")
+                    logger.info(f"Signup rejected: email already in use for {user_credentials_email.email}")
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Email already in use"
@@ -100,7 +100,7 @@ class AuthService:
 
             # Invalid credentials
             await redis_service.register_attempt(user_credentials.username)
-            logger.warning(f"Failed login attempt for username: {user_credentials.username}")
+            logger.info(f"Failed login attempt for username: {user_credentials.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid username or password"
