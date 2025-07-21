@@ -9,9 +9,12 @@ from services.infrastructure.db import DbService
 from services.infrastructure.token import token_service
 from services.infrastructure.redis import redis_service
 
+from security.password_hashing import argon2_ph
+
 from models.user import UserModel
 
-from schemas.user import UserCredentialsEmail, UserSchema
+from schemas.user import UserCredentialsEmail, UserSchema, UserCredentialsEmailHashed
+from schemas.message import EmailConfirmMessage
 from schemas.token import TokenResponse
 from schemas.exceptions import (
     DatabaseError, 
@@ -23,7 +26,7 @@ class AuthService:
     def __init__(self, db: AsyncSession):
         self.db_service = DbService(db)
 
-    async def signup(self, user_credentials_email: UserCredentialsEmail)-> UserSchema:
+    async def signup(self, user_credentials_email: UserCredentialsEmail) -> None:
         try:
             # With Pydantic Models there's no need to validate if Models exist (e.g if user_credentials_email), Pydantic does it automatically
 
@@ -53,11 +56,26 @@ class AuthService:
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Email already in use"
                     )
-                
+            
+            # Register new user
             elif not existing_users :
-                new_user = await self.db_service.insert_user(user_credentials_email)
-                logger.info(f"User {user_credentials_email.email} successfully registered")
-                return UserSchema.model_validate(new_user)
+                hashed_password = argon2_ph.hash_password(user_credentials_email.password)
+                user_credentials_hashed = UserCredentialsEmailHashed(
+                    username=user_credentials_email.username,
+                    hashed_password=hashed_password,
+                    email=user_credentials_email.email
+                )
+                await redis_service.store_user_for_signup(user_credentials_hashed, 30)
+                await redis_service.get_user_for_signup(user_credentials_hashed.email)
+
+                return EmailConfirmMessage(
+                    message=f"An email with confirmation code was sent to {user_credentials_hashed.email}"
+                )
+                
+
+                # new_user = await self.db_service.insert_user(user_credentials_email)
+                # logger.info(f"User {user_credentials_email.email} successfully registered")
+                # return UserSchema.model_validate(new_user)
             
             else:
                 raise DatabaseError("Unexpected number of users found")
@@ -77,7 +95,7 @@ class AuthService:
                 detail="An unexpected error occurred while signing up"
             )
 
-    async def token(self, user_credentials: OAuth2PasswordRequestForm)-> TokenResponse:
+    async def token(self, user_credentials: OAuth2PasswordRequestForm) -> TokenResponse:
         try:
             logger.info(f"Login attempt for username: {user_credentials.username}")
 

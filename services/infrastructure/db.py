@@ -10,7 +10,7 @@ from models.user import UserModel
 from schemas.user import UserCredentialsEmail
 from schemas.exceptions import DatabaseError, UserAlreadyExistsError, UserNotFound
 
-from security.password_hashing import Argon2Ph
+from security.password_hashing import argon2_ph
 
 from typing import Optional, List
 
@@ -53,7 +53,7 @@ class DbService:
         user: UserCredentialsEmail
     ) -> UserModel:
         
-        password_hashed = Argon2Ph().hash_password(user.password)
+        password_hashed = argon2_ph.hash_password(user.password)
         new_user = UserModel(username=user.username, password_hashed=password_hashed, email=user.email)
 
         try:
@@ -88,7 +88,7 @@ class DbService:
                 logger.info(f"Login failed: user not found or password incorrect for '{username}'")
                 return False
             
-            is_valid_password = Argon2Ph().verify_password(hashed_password, password)
+            is_valid_password = argon2_ph.verify_password(hashed_password, password)
             return is_valid_password
         
         except Exception as e:
@@ -100,7 +100,7 @@ class DbService:
         username: str, 
         new_password: str
     ) -> None:
-        new_password_hashed = Argon2Ph().hash_password(new_password)
+        new_password_hashed = argon2_ph.hash_password(new_password)
 
         try:
             statement = (
