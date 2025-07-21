@@ -83,7 +83,7 @@ class RedisService:
         key = self._get_key_stored_user_for_signup(user_email)
         user_info_bytes: bytes = await self.client.get(key)
         user_info_dict: UserCredentialsEmailHashed = json.loads(user_info_bytes.decode())
-        logger.info(f"Retrieved user info for {user_email}: {user_info_dict}")
+        logger.info(f"Retrieved user info for {user_email}")
         return user_info_dict
 
 redis_service = RedisService()

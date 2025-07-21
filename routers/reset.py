@@ -13,13 +13,13 @@ from schemas.token import TokenResponse
 router = APIRouter()
 
 
-@router.post('/email-confirm')
+@router.post('/email/request-confirmation')
 async def send_confirm_email(
-    username_and_email: Email,
+    user_email: str,
     db: AsyncSession = Depends(get_db)
 ):
     return await ResetConfirmService(db).request_email_confirm(
-        username_and_email.email, 
+        user_email, 
     )
 
 @router.post('/password-reset-email')
@@ -28,7 +28,7 @@ async def send_reset_password_email(
     db: AsyncSession = Depends(get_db)
 ): 
     return await ResetConfirmService(db).request_password_reset(
-        email.email, 
+        email.address, 
     )
 
 @router.post('/password-reset')

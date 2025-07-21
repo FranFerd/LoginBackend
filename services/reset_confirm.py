@@ -61,12 +61,11 @@ class ResetConfirmService:
     
     async def request_email_confirm(
         self, 
-        user_email: str, 
-        username: str
+        user_email: str
     ) -> None:
         
         try:
-            await self._request_email(user_email, email_service.send_email_confirm, username)
+            await self._request_email(user_email, email_service.send_email_confirm)
 
         except EmailSendError:
             raise HTTPException(
