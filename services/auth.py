@@ -7,8 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.infrastructure.db import DbService
 from services.infrastructure.token import token_service
-from services.infrastructure.redis import redis_service
 from services.reset_confirm import ResetConfirmService
+from services.infrastructure.redis import (
+    redis_attempt_limiter,
+    redis_user_for_signup,
+    redis_email_code
+)
 
 from security.password_hashing import argon2_ph
 
@@ -71,7 +75,7 @@ class AuthService:
         return user_credentials_hashed
     
     async def _verify_email_confirmation_code(self, code_to_verify: int, credentials: Credentials) -> bool:
-        code_redis = await redis_service.get_email_confirmation_code(credentials.email)
+        code_redis = await redis_email_code.get_email_confirmation_code(credentials.email)
         if code_redis is None:
             logger.info(f"Confirmation code for '{credentials.email} not found or expired'")
             raise HTTPException(
@@ -116,7 +120,7 @@ class AuthService:
         
         credentials_hashed = self._hash_credentials(credentials)
 
-        await redis_service.store_user_for_signup(credentials_hashed, 10)
+        await redis_user_for_signup.store_user_for_signup(credentials_hashed, 10)
         # await redis_service.get_user_for_signup(user_credentials_hashed.email)
 
         await ResetConfirmService(self.db_service).request_email_confirm(
@@ -132,7 +136,7 @@ class AuthService:
         try:
             logger.info(f"Login attempt for username: {credentials.username}")
 
-            is_blocked = await redis_service.is_blocked(credentials.username)
+            is_blocked = await redis_attempt_limiter.is_blocked(credentials.username)
             if is_blocked:
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -146,11 +150,11 @@ class AuthService:
                     expires_minutes=15
                 )
                 logger.info(f"Access token issued for user {credentials.username}")
-                await redis_service.reset_attempts(credentials.username)
+                await redis_attempt_limiter.reset_attempts(credentials.username)
                 return TokenResponse(access_token=access_token, token_type='bearer')
 
             # Invalid credentials
-            await redis_service.register_attempt(credentials.username)
+            await redis_attempt_limiter.register_attempt(credentials.username)
             logger.info(f"Failed login attempt for username: {credentials.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

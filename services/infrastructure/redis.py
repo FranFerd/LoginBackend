@@ -11,12 +11,7 @@ from datetime import timedelta
 
 from schemas.user import CredentialsHashed
 
-
-class RedisService:
-
-    MAX_ATTEMPTS = 5
-    EXPIRATION_TIME = 15 # seconds
-
+class _RedisBase:
     def __init__(self):
         try:
             self.client = Redis(
@@ -29,18 +24,13 @@ class RedisService:
             logger.critical("Failed to initialize Redis client")
             raise # 'raise' is better that 'raise e' because traceback starts where the error happened, not where it was caught (raise e)
 
+class RedisAttemptLimiter(_RedisBase):
+    MAX_ATTEMPTS = 5
+    EXPIRATION_TIME = 15 # seconds
+
     def _get_key_login_fail(self, username: str) -> str:
         return f"login_fail:{username}"
     
-    def _get_key_password_reset_token(self, username: str) -> str:
-        return f"password_reset_token:{username}"
-    
-    def _get_key_stored_user_for_signup(self, email: str) -> str:
-        return f"signup:{email}"
-    
-    def _get_key_email_confirmation_code(self, email: str) -> str:
-        return f"email_confirm:{email}"
-
     async def register_attempt(self, username: str) -> None:
         key = self._get_key_login_fail(username)
 
@@ -63,6 +53,10 @@ class RedisService:
         await self.client.delete(key)
         logger.info(f"Login attempts reset for user '{username}'")
 
+class RedisPasswordResetToken(_RedisBase):
+    def _get_key_password_reset_token(self, username: str) -> str:
+        return f"password_reset_token:{username}"
+
     async def store_password_reset_token(self, username: str, token: str, expires_minutes: int) -> None:
         key = self._get_key_password_reset_token(username)
 
@@ -82,6 +76,10 @@ class RedisService:
         await self.client.delete(key)
         logger.info(f"Password reset token expired for user '{username}'")
 
+class RedisUserForSignup(_RedisBase):
+    def _get_key_stored_user_for_signup(self, email: str) -> str:
+        return f"signup:{email}"
+    
     async def store_user_for_signup(self, user_info: CredentialsHashed, expires_minutes: int) -> None:
         key = self._get_key_stored_user_for_signup(user_info.email)
 
@@ -97,6 +95,10 @@ class RedisService:
         logger.info(f"Fetched user info for '{user_email}'")
         return user_info_dict
     
+class RedisEmailCode(_RedisBase):
+    def _get_key_email_confirmation_code(self, email: str) -> str:
+        return f"email_confirm:{email}"
+
     async def store_email_confirmation_code(self, code: str, email: str, expires_minutes: int) -> None:
         key = self._get_key_email_confirmation_code(email)
         await self.client.setex(key, timedelta(minutes=expires_minutes), code)
@@ -118,4 +120,7 @@ class RedisService:
             logger.exception(f"Failed to decode email confirmation code for '{email}'")
             return None
 
-redis_service = RedisService()
+redis_attempt_limiter = RedisAttemptLimiter()
+redis_password_reset_token = RedisPasswordResetToken()
+redis_user_for_signup = RedisUserForSignup()
+redis_email_code = RedisEmailCode()
