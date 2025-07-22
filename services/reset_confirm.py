@@ -12,6 +12,7 @@ from services.infrastructure.db import DbService
 from services.infrastructure.email import email_service
 from services.infrastructure.token import token_service
 from services.infrastructure.redis import redis_service
+from utils.email_contents import email_contents
 
 from schemas.user import PasswordResetRequest
 from schemas.token import TokenResponse, TokenSub
@@ -29,7 +30,7 @@ class ResetConfirmService:
     ) -> None: 
         
         loop = asyncio.get_running_loop() # sending email is sync. executor runs blocking (synchronous) code in a separate thread without blocking async
-        await loop.run_in_executor(None, func, user_email, *args) # user_emila and *args are arguments passed to func
+        await loop.run_in_executor(None, func, user_email, *args) # user_email and *args are arguments passed to func
             
     async def request_password_reset(
         self, 
@@ -61,16 +62,20 @@ class ResetConfirmService:
     
     async def request_email_confirm(
         self, 
-        user_email: str
+        user_email: str,
+        username: str
     ) -> None:
         
         try:
-            await self._request_email(user_email, email_service.send_email_confirm)
+            await self._request_email(user_email, email_service.send_email_confirm, username)
+            code = email_contents.code
+            await redis_service.store_email_confirmation_code(code, user_email, 10)
 
         except EmailSendError:
+            logger.exception("Unexpected error while requesting email confirmation")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Unexpected error while requesting email confirm"
+                detail="Unexpected error while requesting email confirmation"
             )
         
     async def reset_password(

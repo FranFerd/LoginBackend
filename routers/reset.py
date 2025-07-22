@@ -7,7 +7,7 @@ from services.reset_confirm import ResetConfirmService
 from dependencies.db import get_db
 from dependencies.token import get_token_from_header
 
-from schemas.user import Email, PasswordResetRequest
+from schemas.user import Email, PasswordResetRequest, UsernameEmail
 from schemas.token import TokenResponse
 
 router = APIRouter()
@@ -15,11 +15,12 @@ router = APIRouter()
 
 @router.post('/email/request-confirmation')
 async def send_confirm_email(
-    user_email: str,
+    username_email: UsernameEmail,
     db: AsyncSession = Depends(get_db)
 ):
     return await ResetConfirmService(db).request_email_confirm(
-        user_email, 
+        user_email=username_email.email,
+        username=username_email.username 
     )
 
 @router.post('/password-reset-email')

@@ -14,7 +14,7 @@ class UserSchema(BaseModel):
         "from_attributes": True # Now Pydantic can read attributes from ORM objects (not just dicts)
     }                           # It is Needed to pass models with model_validate(orm_obj)
 
-class UserCredentialsEmail(BaseModel):
+class Credentials(BaseModel):
     username: str = Field(..., min_length=3, max_length=12) # '...' is required to make it not optional when using Field. Without Field, fields are required by default
     password: str = Field(..., min_length=6, max_length=30)
     email: EmailStr
@@ -24,7 +24,7 @@ class UserCredentialsEmail(BaseModel):
     def check_email_length(cls, v):
         return validate_email_length(v)
 
-class UserCredentialsEmailHashed(BaseModel):
+class CredentialsHashed(BaseModel):
     username: str = Field(..., min_length=3, max_length=12) # '...' is required to make it not optional when using Field. Without Field, fields are required by default
     hashed_password: str = Field(..., min_length=6, max_length=255)
     email: EmailStr
@@ -33,6 +33,10 @@ class UserCredentialsEmailHashed(BaseModel):
     @classmethod # Needed for Pydantic firld validation
     def check_email_length(cls, v):
         return validate_email_length(v)
+    
+class UsernameEmail(BaseModel):
+    username: str
+    email: str
 
 class Email(BaseModel):
     address: EmailStr

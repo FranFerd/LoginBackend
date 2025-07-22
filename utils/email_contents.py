@@ -2,9 +2,9 @@ import random
 
 class EmailContents:
     def __init__(self):
-        self.code = self._get_code()
+        self.code = self.get_code()
 
-    def _get_code(self) -> str:
+    def get_code(self) -> str:
         code = [str(random.randint(0, 9)) for _ in range(6)]
         return ''.join(code)
 
