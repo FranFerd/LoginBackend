@@ -7,13 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.infrastructure.db import DbService
 from services.infrastructure.token import token_service
-from services.infrastructure.redis import redis_service
+from services.reset_confirm import ResetConfirmService
+from services.infrastructure.redis import (
+    redis_attempt_limiter,
+    redis_user_for_signup,
+    redis_email_code
+)
 
 from security.password_hashing import argon2_ph
 
 from models.user import UserModel
 
-from schemas.user import UserCredentialsEmail, UserSchema, UserCredentialsEmailHashed
+from schemas.user import Credentials, UserSchema, CredentialsHashed, CodeAndEmail
 from schemas.message import EmailConfirmMessage
 from schemas.token import TokenResponse
 from schemas.exceptions import (
@@ -25,15 +30,69 @@ from schemas.exceptions import (
 class AuthService:
     def __init__(self, db: AsyncSession):
         self.db_service = DbService(db)
+        self.helper = AuthServiceHelper(db)
 
-    async def _ensure_user_does_not_exist(self, user_credentials_email: UserCredentialsEmail) -> None:
+    async def request_email_confirmation(self, credentials: Credentials) -> EmailConfirmMessage:
+        logger.info(f"Signup attempt for user '{credentials.username}'")
+        
+        await self.helper.ensure_user_does_not_exist(credentials)
+        
+        credentials_hashed = self.helper.hash_credentials(credentials)
+
+        await redis_user_for_signup.store_user_for_signup(credentials_hashed, 10)
+
+        await ResetConfirmService(self.db_service).request_email_confirm(
+            user_email=credentials.email,
+            username=credentials.username
+        )
+
+        return EmailConfirmMessage(
+            message=f"An email with confirmation code was sent to {credentials_hashed.email}"
+        )
+    
+    async def register_user(self, code_and_email: CodeAndEmail) -> UserSchema:
+        logger.info(f"Email code verification attempt for user '{code_and_email.email}'")
+        await self.helper.verify_email_confirmation_code(code_and_email)
+        
+        stored_credentials = await redis_user_for_signup.get_user_for_signup(code_and_email.email)
+        new_user = await self.helper.insert_new_user(stored_credentials)
+
+        await redis_email_code.delete_email_confirmation_code(code_and_email.email)
+        return new_user
+
+
+    async def token(self, credentials: OAuth2PasswordRequestForm) -> TokenResponse:
+        try:
+            logger.info(f"Login attempt for username: {credentials.username}")
+
+            await self.helper.check_if_blocked(credentials)
+            
+            is_valid_user = await self.db_service.verify_user(credentials.username, credentials.password)
+            if not is_valid_user:
+                await self.helper.register_login_attempt(credentials)
+
+            # If valid credentials
+            return self.helper.create_token(credentials)
+        
+        except (TokenCreationError, DatabaseError):
+            logger.exception(f"Unexpected error during token generation")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Token generation error"
+            )
+
+class AuthServiceHelper:
+    def __init__(self, db: AsyncSession):
+        self.db_service = DbService(db)
+    
+    async def ensure_user_does_not_exist(self, credentials: Credentials) -> None:
         existing_users = await self.db_service.get_user_by_username_or_email(
-                user_credentials_email.username, 
-                user_credentials_email.email
+                credentials.username, 
+                credentials.email
             )
             
         if len(existing_users) == 2:
-            logger.info(f"Signup rejected: username and email already in use for {user_credentials_email.email}")
+            logger.info(f"Signup rejected: username and email already in use for {credentials.email}")
             raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST, 
                     detail="Username and email already in use"
@@ -41,50 +100,58 @@ class AuthService:
         
         elif len(existing_users) == 1:
             user: UserModel = existing_users[0] 
-            if user.username == user_credentials_email.username:
-                logger.info(f"Signup rejected: username already in use for '{user_credentials_email.username}'")
+            if user.username == credentials.username:
+                logger.info(f"Signup rejected: username already in use for '{credentials.username}'")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST, 
                     detail="Username already exists")
             
-            if user.email == user_credentials_email.email:
-                logger.info(f"Signup rejected: email already in use for {user_credentials_email.email}")
+            if user.email == credentials.email:
+                logger.info(f"Signup rejected: email already in use for {credentials.email}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Email already in use"
                 )
+        
+        elif len(existing_users) == 0:
+            return
+
         else:
             raise DatabaseError("Unexpected number of users found")
         
-    def _hash_credentials(self, user_credentials_email: UserCredentialsEmail) -> UserCredentialsEmailHashed:
-        hashed_password = argon2_ph.hash_password(user_credentials_email.password)
-        user_credentials_hashed = UserCredentialsEmailHashed(
-            username=user_credentials_email.username,
+    def hash_credentials(self, credentials: Credentials) -> CredentialsHashed:
+        hashed_password = argon2_ph.hash_password(credentials.password)
+        user_credentials_hashed = CredentialsHashed(
+            username=credentials.username,
             hashed_password=hashed_password,
-            email=user_credentials_email.email
+            email=credentials.email
         )
         return user_credentials_hashed
-
-    async def signup(self, user_credentials_email: UserCredentialsEmail) -> None:
-        try:
-            self._ensure_user_does_not_exist(user_credentials_email)
-            
-            user_credentials_hashed = self._hash_credentials(user_credentials_email)
-
-            await redis_service.store_user_for_signup(user_credentials_hashed, 30)
-            await redis_service.get_user_for_signup(user_credentials_hashed.email)
-
-            return EmailConfirmMessage(
-                message=f"An email with confirmation code was sent to {user_credentials_hashed.email}"
+    
+    async def verify_email_confirmation_code(self, code_and_email: CodeAndEmail) -> None:
+        code_redis = await redis_email_code.get_email_confirmation_code(code_and_email.email)
+        if code_redis is None:
+            logger.info(f"Confirmation code for '{code_and_email.email} not found or expired'")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Code expired or doesn't exist"
             )
-                
+        if code_and_email.code == code_redis:
+            logger.info(f"Email code for '{code_and_email.email} confirmed successfully'")
+            return
+        
+        logger.info(f"Incorrect email code attempt for '{code_and_email.email}'")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Codes do not match"
+        )
+    
+    async def insert_new_user(self, credentials_hashed: CredentialsHashed) -> UserSchema:
+        try:
+            new_user = await self.db_service.insert_user(credentials_hashed)
+            logger.info(f"User {credentials_hashed.email} successfully registered")
+            return UserSchema.model_validate(new_user)
 
-                # new_user = await self.db_service.insert_user(user_credentials_email)
-                # logger.info(f"User {user_credentials_email.email} successfully registered")
-                # return UserSchema.model_validate(new_user)
-            
-
-            
         except UserAlreadyExistsError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -93,45 +160,35 @@ class AuthService:
         
         except DatabaseError:
             logger.exception(
-                f"Unexpected error during signup for {user_credentials_email.username} / {user_credentials_email.email}"
+                f"Unexpected error during signup for {credentials_hashed.username} / {credentials_hashed.email}"
             )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="An unexpected error occurred while signing up"
             )
-
-    async def token(self, user_credentials: OAuth2PasswordRequestForm) -> TokenResponse:
-        try:
-            logger.info(f"Login attempt for username: {user_credentials.username}")
-
-            is_blocked = await redis_service.is_blocked(user_credentials.username)
-            if is_blocked:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Too many attempts"
-                )
-            
-            is_valid_user = await self.db_service.verify_user(user_credentials.username, user_credentials.password)
-            if is_valid_user:
-                access_token = token_service.create_access_token(
-                    username=user_credentials.username,
-                    expires_minutes=15
-                )
-                logger.info(f"Access token issued for user {user_credentials.username}")
-                await redis_service.reset_attempts(user_credentials.username)
-                return TokenResponse(access_token=access_token, token_type='bearer')
-
-            # Invalid credentials
-            await redis_service.register_attempt(user_credentials.username)
-            logger.info(f"Failed login attempt for username: {user_credentials.username}")
+        
+    async def check_if_blocked(self, credentials: Credentials) -> None:
+        is_blocked = await redis_attempt_limiter.is_blocked(credentials.username)
+        if is_blocked:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password"
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many attempts"
             )
         
-        except (TokenCreationError, DatabaseError):
-            logger.exception(f"Unexpected error during token generation")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Token generation error"
-            )
+    async def create_token(self, credentials: Credentials) -> TokenResponse:
+        access_token = token_service.create_access_token(
+            username=credentials.username,
+            expires_minutes=15
+        )
+
+        logger.info(f"Access token issued for user {credentials.username}")
+        await redis_attempt_limiter.reset_attempts(credentials.username)
+        return TokenResponse(access_token=access_token, token_type='bearer')
+        
+    async def register_login_attempt(self, credentials: Credentials) -> None:
+        await redis_attempt_limiter.register_attempt(credentials.username)
+        logger.info(f"Failed login attempt for username: {credentials.username}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
+        )

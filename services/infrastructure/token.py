@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from configs.app_settings import settings
 
-from services.infrastructure.redis import redis_service
+from services.infrastructure.redis import redis_password_reset_token
 
 from schemas.exceptions import InvalidTokenError, TokenNotFoundError, TokenCreationError
 
@@ -26,7 +26,7 @@ class TokenService:
             raise TokenCreationError from e     
     
     async def validate_password_reset_token_from_redis(self, username: str, token_to_validate: str):
-        stored_token = await redis_service.get_password_reset_token(username)
+        stored_token = await redis_password_reset_token.get_password_reset_token(username)
         if stored_token is None:
             logger.info(f"No password reset token found for user '{username}'")
             raise TokenNotFoundError("Token expired or doesn't exist")

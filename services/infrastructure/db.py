@@ -7,7 +7,7 @@ from sqlalchemy import or_, update
 
 from models.user import UserModel
 
-from schemas.user import UserCredentialsEmail
+from schemas.user import CredentialsHashed
 from schemas.exceptions import DatabaseError, UserAlreadyExistsError, UserNotFound
 
 from security.password_hashing import argon2_ph
@@ -50,11 +50,14 @@ class DbService:
         
     async def insert_user(
         self, 
-        user: UserCredentialsEmail
+        credentials_hashed: CredentialsHashed
     ) -> UserModel:
         
-        password_hashed = argon2_ph.hash_password(user.password)
-        new_user = UserModel(username=user.username, password_hashed=password_hashed, email=user.email)
+        new_user = UserModel(
+            username=credentials_hashed.username, 
+            password_hashed=credentials_hashed.hashed_password, 
+            email=credentials_hashed.email
+        )
 
         try:
             self.db.add(new_user)
@@ -64,7 +67,7 @@ class DbService:
         
         except IntegrityError as e: # Occurs when constraints are violated (unique, not null, fks)
             await self.db.rollback() # Always rollback on error
-            logger.info(f"IntegrityError while inserting user: username={user.username}, email={user.email}")
+            logger.info(f"IntegrityError while inserting user: username={credentials_hashed.username}, email={credentials_hashed.email}")
             raise UserAlreadyExistsError("Username or email already in use") from e
         
         except Exception as e:
