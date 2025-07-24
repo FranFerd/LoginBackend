@@ -55,3 +55,7 @@ class PasswordResetRequest(BaseModel):
         if self.new_password != self.new_password_confirm:
             raise ValueError("Passwords do not match")
         return self # Always return self after validation. If not - error
+    
+class CodeAndEmail(BaseModel):
+    code: str
+    email: str

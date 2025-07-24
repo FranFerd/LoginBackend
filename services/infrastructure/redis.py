@@ -19,9 +19,9 @@ class _RedisBase:
                 port=settings.REDIS_PORT,
                 db=settings.REDIS_DB
             )
-            logger.info(f"Redis initialized on port {settings.REDIS_PORT}")
+            logger.info(f"Redis service initialized on port {settings.REDIS_PORT}")
         except Exception:
-            logger.critical("Failed to initialize Redis client")
+            logger.critical("Failed to initialize Redis service")
             raise # 'raise' is better that 'raise e' because traceback starts where the error happened, not where it was caught (raise e)
 
 class RedisAttemptLimiter(_RedisBase):
@@ -90,10 +90,10 @@ class RedisUserForSignup(_RedisBase):
         key = self._get_key_stored_user_for_signup(user_email)
 
         user_info_bytes: bytes = await self.client.get(key)
-        user_info_dict: CredentialsHashed = json.loads(user_info_bytes.decode())
+        user_info_dict: dict = json.loads(user_info_bytes.decode())
 
         logger.info(f"Fetched user info for '{user_email}'")
-        return user_info_dict
+        return CredentialsHashed(**user_info_dict)
     
 class RedisEmailCode(_RedisBase):
     def _get_key_email_confirmation_code(self, email: str) -> str:
@@ -104,7 +104,7 @@ class RedisEmailCode(_RedisBase):
         await self.client.setex(key, timedelta(minutes=expires_minutes), code)
         logger.info(f"Stored email confirmation code for '{email} for {expires_minutes} minutes'")
 
-    async def get_email_confirmation_code(self, email: str) -> Optional[int]:
+    async def get_email_confirmation_code(self, email: str) -> Optional[str]:
         key = self._get_key_email_confirmation_code(email)
 
         code_bytes: bytes = await self.client.get(key)
@@ -112,13 +112,19 @@ class RedisEmailCode(_RedisBase):
             return None
         
         try:
-            code_int = int(code_bytes.decode())
+            code_str = str(code_bytes.decode())
             logger.info(f"Fetched email confirmation code for '{email}'")
-            return code_int
+            return code_str
         
         except (ValueError, UnicodeDecodeError):
             logger.exception(f"Failed to decode email confirmation code for '{email}'")
             return None
+
+    async def delete_email_confirmation_code(self, email: str) -> None:
+        key = self._get_key_email_confirmation_code(email)
+
+        await self.client.delete(key)
+        logger.info(f"Deleted email confirmation code for '{email}'")
 
 redis_attempt_limiter = RedisAttemptLimiter()
 redis_password_reset_token = RedisPasswordResetToken()
