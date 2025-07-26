@@ -39,7 +39,7 @@ class AuthService:
         
         credentials_hashed = self.helper.hash_credentials(credentials)
 
-        await redis_user_for_signup.store_user_for_signup(credentials_hashed, 10)
+        await redis_user_for_signup.store_user_for_signup(credentials_hashed, 30)
 
         await ResetConfirmService(self.db_service).request_email_confirm(
             user_email=credentials.email,
@@ -60,7 +60,6 @@ class AuthService:
         await redis_email_code.delete_email_confirmation_code(code_and_email.email)
         return new_user
 
-
     async def token(self, credentials: OAuth2PasswordRequestForm) -> TokenResponse:
         try:
             logger.info(f"Login attempt for username: {credentials.username}")
@@ -72,7 +71,7 @@ class AuthService:
                 await self.helper.register_login_attempt(credentials)
 
             # If valid credentials
-            return self.helper.create_token(credentials)
+            return await self.helper.create_token(credentials)
         
         except (TokenCreationError, DatabaseError):
             logger.exception(f"Unexpected error during token generation")
@@ -114,6 +113,7 @@ class AuthServiceHelper:
                 )
         
         elif len(existing_users) == 0:
+            logger.info(f"{credentials.username} doesn't exist")
             return
 
         else:

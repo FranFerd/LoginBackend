@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dependencies.token import decode_token
 
-from utils.email_contents import email_contents
+from utils.email_contents import EmailContents
+from utils.email_code import CodeGenerator
 from services.infrastructure.db import DbService
 from services.infrastructure.email import email_service
 from services.infrastructure.token import token_service
@@ -70,9 +71,9 @@ class ResetConfirmService:
     ) -> None:
         
         try:
-            await self._request_email(user_email, email_service.send_email_confirm, username)
-            code = email_contents.code
-            await redis_email_code.store_email_confirmation_code(code, user_email, 10)
+            code = CodeGenerator.generate_code(length=6)
+            await self._request_email(user_email, email_service.send_email_confirm, username, code)
+            await redis_email_code.store_email_confirmation_code(code, user_email, 30)
 
         except EmailSendError:
             logger.exception("Unexpected error while requesting email confirmation")
