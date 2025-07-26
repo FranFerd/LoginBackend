@@ -4,7 +4,7 @@ import yagmail
 
 from configs.app_settings import settings
 
-from utils.email_contents import email_contents
+from utils.email_contents import EmailContents
 
 from schemas.exceptions import EmailSendError
 
@@ -37,26 +37,29 @@ class EmailService:
         token: str
     ) -> None:
         
-        text_fallback = email_contents.get_plain_text_password_reset(username, token)
-        html_content = email_contents.get_html_password_reset(username, token)
+        text_fallback = EmailContents.get_plain_text_password_reset(username, token)
+        html_content = EmailContents.get_html_password_reset(username, token)
         self._send_email(
             email,
             subject="Password reset",
             contents=[text_fallback, html_content]
         )
+        logger.info(f"Password reset link sent to {email}")
 
     def send_email_confirm(
         self, 
         email: str, 
-        username: str
-    ) -> None: # Add hello, username
+        username: str,
+        code: str
+    ) -> None:
         
-        text_fallback = email_contents.get_plain_text_email_confirm(username)
-        html_content = email_contents.get_html_email_confirm(username)
+        text_fallback = EmailContents.get_plain_text_email_confirm(username, code)
+        html_content = EmailContents.get_html_email_confirm(username, code)
         self._send_email(
             email,
             subject="Email confirmation",
             contents=[text_fallback, html_content]
         )
+        logger.info(f"Email confirmation code sent to {email}")
         
 email_service = EmailService()
