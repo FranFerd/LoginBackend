@@ -5,7 +5,7 @@ from dependencies.db import get_db
 from services.auth import AuthService
 
 from schemas.user import Credentials, CodeAndEmail
-from schemas.message import EmailConfirmMessage
+from schemas.message import EmailConfirmMessage, UserRegisteredMessage
 
 router = APIRouter()
 
@@ -16,7 +16,7 @@ async def signup_request_confirm(
 ):
     return await AuthService(db).request_email_confirmation(user_credentials)
 
-@router.post('/signup/register')
+@router.post('/signup/register', response_model=UserRegisteredMessage)
 async def signup_register(
     code_and_email: CodeAndEmail,
     db: AsyncSession = Depends(get_db) 

@@ -19,7 +19,7 @@ from security.password_hashing import argon2_ph
 from models.user import UserModel
 
 from schemas.user import Credentials, UserSchema, CredentialsHashed, CodeAndEmail
-from schemas.message import EmailConfirmMessage
+from schemas.message import EmailConfirmMessage, UserRegisteredMessage
 from schemas.token import TokenResponse
 from schemas.exceptions import (
     DatabaseError, 
@@ -50,7 +50,7 @@ class AuthService:
             message=f"An email with confirmation code was sent to {credentials_hashed.email}"
         )
     
-    async def register_user(self, code_and_email: CodeAndEmail) -> UserSchema:
+    async def register_user(self, code_and_email: CodeAndEmail) -> UserRegisteredMessage:
         logger.info(f"Email code verification attempt for user '{code_and_email.email}'")
         await self.helper.verify_email_confirmation_code(code_and_email)
         
@@ -58,7 +58,11 @@ class AuthService:
         new_user = await self.helper.insert_new_user(stored_credentials)
 
         await redis_email_code.delete_email_confirmation_code(code_and_email.email)
-        return new_user
+
+        logger.info(f"User with id {new_user.id} registered successfully")
+        return UserRegisteredMessage(
+            message=f"User {new_user.username} registered successfully"
+        )
 
     async def token(self, credentials: OAuth2PasswordRequestForm) -> TokenResponse:
         try:
