@@ -7,7 +7,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 # @router.get("/users")
-# def read_users(db: Session = Depends(get_db)):
+# def read_users(db: AsyncSession = Depends(get_db)):
 #    users = db.query(User).all()
 #     return users
 
