@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dependencies.token import decode_token
 
-from utils.email_contents import EmailContents
 from utils.email_code import CodeGenerator
 from services.infrastructure.db import DbService
 from services.infrastructure.email import email_service

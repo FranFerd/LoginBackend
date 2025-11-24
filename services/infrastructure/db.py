@@ -23,7 +23,7 @@ class DbService:
 
         except Exception:
             logger.critical("Failed to initialize DB service")
-            raise # 'raise' is better that 'raise e' because traceback starts where the error happened, not where it was caught (raise e)
+            raise # 'raise' is better that 'raise e' because in this case traceback starts where the error happened. 'raise e' traces back where it was caught (right where 'raise e' is written, which is not useful)
 
     async def get_user_by_username_or_email(
         self, 
