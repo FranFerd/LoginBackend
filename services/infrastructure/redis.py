@@ -95,6 +95,12 @@ class RedisUserForSignup(_RedisBase):
         logger.info(f"Fetched user info for '{user_email}'")
         return CredentialsHashed(**user_info_dict)
     
+    async def delete_user_from_redis(self, user_email:str) -> None:
+        key = self._get_key_stored_user_for_signup(user_email)
+
+        await self.client.delete(key)
+        logger.info(f"Deleted user '{user_email}' for signup")
+    
 class RedisEmailCode(_RedisBase):
     def _get_key_email_confirmation_code(self, email: str) -> str:
         return f"email_confirm:{email}"

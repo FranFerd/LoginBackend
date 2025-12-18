@@ -58,8 +58,9 @@ class AuthService:
         new_user = await self.helper.insert_new_user(stored_credentials)
 
         await redis_email_code.delete_email_confirmation_code(code_and_email.email)
+        await redis_user_for_signup.delete_user_from_redis(code_and_email.email)
 
-        logger.info(f"User with id {new_user.id} registered successfully")
+        logger.info(f"User with id '{new_user.id}' registered successfully")
         return UserRegisteredMessage(
             message=f"User {new_user.username} registered successfully"
         )
@@ -153,7 +154,7 @@ class AuthServiceHelper:
     async def insert_new_user(self, credentials_hashed: CredentialsHashed) -> UserSchema:
         try:
             new_user = await self.db_service.insert_user(credentials_hashed)
-            logger.info(f"User {credentials_hashed.email} successfully registered")
+            logger.info(f"User {credentials_hashed.email} registered successfully")
             return UserSchema.model_validate(new_user)
 
         except UserAlreadyExistsError:
